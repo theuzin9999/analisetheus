@@ -1,0 +1,1256 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Auxílio Aviator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    (function checkLoginStatus() {
+        const isLoggedIn = localStorage.getItem('isLoggedIn');
+        if (isLoggedIn !== 'true') {
+            window.location.replace('/'); 
+        }
+    })();
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    :root {
+      --bg-1: #050418; /* Dark gradient start */
+      --bg-2: #0b0f2b; /* Dark gradient end */
+      --text: #eaf0ff; /* Light text */
+      --muted: #9aa4c7; /* Muted text */
+      --accent: #3ddc97; /* Highlight green */
+      --rose: #ff4b91; /* Pink */
+      --purple: #9b59ff; /* Purple */
+      --blue: #4cc9f0; /* Blue */
+      --danger: #ff5c8a; /* Red */
+      --glass-blur: blur(14px) saturate(180%); /* Glassmorphism effect */
+      --border: rgba(255,255,255,0.08); /* Subtle border */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      color: var(--text);
+      padding: 30px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      max-width: 1360px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 26px;
+    }
+    /* HEADER */
+    .header-status {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 22px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      backdrop-filter: var(--glass-blur);
+      background: rgba(255,255,255,0.02);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    }
+    .logo-main {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo-main img {
+      height: 90px;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.35));
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      padding: 4px;
+    }
+    .logo-main h1 {
+      display: none;
+    }
+    #alerts {
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: rgba(61,220,151,0.06);
+      border: 1px solid rgba(61,220,151,0.25);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .status-error {
+      background: rgba(255,92,138,0.06) !important;
+      border-color: rgba(255,92,138,0.25) !important;
+      color: var(--danger) !important;
+    }
+    /* CARDS */
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      backdrop-filter: var(--glass-blur);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0 0 16px 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    /* MÉDIAS */
+    .avg-card h1 { 
+      color: var(--purple); 
+    }
+    .avg-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .avg-item {
+      text-align: center;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+    .avg-item .label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .avg-item .value {
+      font-size: 1.9rem;
+      margin-top: 4px;
+    }
+    .avg-blue { background: linear-gradient(135deg, #061c44, #0a234d); color: var(--blue); }
+    .avg-purple { background: linear-gradient(135deg, #1e0e3a, #371868); color: var(--purple); }
+    .avg-rose { background: linear-gradient(135deg, #3c0b1e, #5a1233); color: var(--rose); }
+    /* DETECÇÕES */
+    .patterns-button {
+      background: linear-gradient(90deg, var(--purple), #7b3bff);
+      color: white;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: transform 0.2s ease;
+    }
+    .patterns-button:hover {
+      transform: translateY(-2px);
+    }
+    #detTable {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-top: 12px;
+    }
+    #detTable th, #detTable td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    #detTable th {
+      color: var(--accent);
+      text-align: left;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    #detTable td:last-child {
+      text-align: center;
+      width: 40px;
+    }
+    .det-note {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    /* SIDEBAR */
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .metrics-card h1 {
+      font-size: 1.15rem;
+    }
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .metric-item {
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+    }
+    .metric-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .metric-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .metric-value small {
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .metric-value.rosa { color: var(--rose); }
+    .metric-value.roxo { color: var(--purple); }
+    .metric-value.azul { color: var(--blue); }
+    .metric-value.num { color: var(--accent); }
+    .btn-clear {
+      background: linear-gradient(90deg, var(--danger), #c2436b);
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 14px;
+      width: 100%;
+      transition: transform 0.2s ease;
+    }
+    .btn-clear:hover {
+      transform: translateY(-2px);
+    }
+    /* HISTÓRICO */
+    .history-card {
+      text-align: center;
+    }
+    .history-card h1 {
+      justify-content: center;
+      gap: 10px;
+    }
+    .history-card h1 img {
+      height: 48px;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
+    }
+    #historyGrid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      max-height: 460px;
+      overflow-y: auto;
+      margin-top: 12px;
+    }
+    .chip {
+      min-width: 80px;
+      padding: 10px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .chip .val {
+      font-size: 1.2rem;
+      margin-bottom: 4px;
+    }
+    .chip .time {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.6);
+    }
+    .c-low { background: linear-gradient(135deg, #1a2fb6, #0a1444); }
+    .c-mid { background: linear-gradient(135deg, #5b17b0, #2b1054); }
+    .c-high { background: linear-gradient(135deg, #a81859, #5c1233); }
+    .chip.pred-chip {
+      width: 100%;
+      background: rgba(61,220,151,0.06);
+      border: 1px solid rgba(61,220,151,0.15);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .c-tome {
+      background: rgba(255,92,138,0.06) !important;
+      border: 1px solid rgba(255,92,138,0.15) !important;
+      color: var(--danger) !important;
+    }
+    /* MODAL */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: rgba(0,0,0,0.85);
+      padding-top: 60px;
+    }
+    .modal-content {
+      background: rgba(255,255,255,0.03);
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid var(--border);
+      width: 85%;
+      max-width: 480px;
+      border-radius: 16px;
+      backdrop-filter: var(--glass-blur);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+    }
+    .modal-close {
+      color: var(--muted);
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+    .modal-close:hover {
+      color: var(--text);
+    }
+    .modal-content h2 {
+      color: var(--rose);
+      margin-bottom: 16px;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .modal-content ul {
+      list-style-type: none;
+      padding: 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .modal-content ul li {
+      background: rgba(255,255,255,0.03);
+      margin-bottom: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      border-left: 4px solid var(--rose);
+      font-size: 0.95rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-content ul li .count {
+      font-weight: 700;
+      color: var(--accent);
+    }
+    /* RESPONSIVIDADE */
+    @media (max-width: 950px) {
+      body { padding: 15px; }
+      .wrap { grid-template-columns: 1fr; gap: 20px; }
+      .header-status { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .logo-main img { height: 70px; }
+      .avg-grid { grid-template-columns: repeat(1, 1fr); }
+      .side { order: 1; }
+      .main-content { order: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+  
+  <header class="header-status">
+    <div class="logo-main">
+        <img src="https://i.postimg.cc/VSNCSnpY/aviator-logo.png" alt="Aviator Logo" />
+        <h1>AUXÍLIO ANÁLISE</h1>
+    </div>
+    <div id="alerts">Status: Conectando...</div>
+  </header>
+
+  <section class="main-content">
+
+    <div class="card avg-card">
+        <h1><i class="fas fa-chart-area"></i> Médias de Saída Segura (Piso Mínimo)</h1>
+        <div class="avg-grid">
+            <div class="avg-item avg-blue">
+                <div class="label">MÉDIA AZUL</div>
+                <div class="value" id="avgBlueEl">—</div>
+            </div>
+            <div class="avg-item avg-purple">
+                <div class="label">MÉDIA ROXA</div>
+                <div class="value" id="avgPurpleEl">—</div>
+            </div>
+            <div class="avg-item avg-rose">
+                <div class="label">MÉDIA ROSA</div>
+                <div class="value" id="avgPinkEl">—</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h1><i class="fas fa-bullseye"></i> Detecções Ativas e Padrões de Rosa</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <p style="margin: 0; font-size: 0.9rem; color: var(--muted);">Padrões de Repetição de Rosa Ativos:</p>
+            <button class="patterns-button" onclick="document.getElementById('roseModal').style.display='block'">
+                Ver Repetições Ativas
+            </button>
+        </div>
+        
+        <table id="detTable">
+          <thead>
+            <tr>
+              <th>Detector</th>
+              <th>Nota / Condição</th>
+              <th>Sinal</th>
+            </tr>
+          </thead>
+          <tbody>
+            </tbody>
+        </table>
+    </div>
+  </section>
+  
+  <aside class="side" role="complementary">
+    
+    <div class="card metrics-card">
+        <h1><i class="fas fa-bolt"></i> Métricas Rápidas</h1>
+        <div class="metrics-grid">
+            
+            <div class="metric-item">
+                <div class="metric-label">Velas inferiores a 50x</div>
+                <div class="metric-value rosa">
+                    <span id="lowSpikeCount">—</span>
+                    <small>velas</small>
+                </div>
+            </div>
+            
+            <div class="metric-item">
+                <div class="metric-label">Rodadas sem Rosa (≥10x)</div>
+                <div class="metric-value rosa">
+                    <span id="sinceRose">—</span>
+                    <small>rodadas</small>
+                </div>
+            </div>
+            
+            <div class="metric-item">
+                <div class="metric-label">Janela (Últimas 14)</div>
+                <div class="metric-value azul">
+                    <span id="windowCount">—</span>
+                    <small>velas</small>
+                </div>
+            </div>
+            
+            <div class="metric-item" style="grid-column: span 2;">
+                <div class="metric-label" style="text-align: center;">Ferramenta Automática Ativa</div>
+                <div class="metric-value num" style="justify-content: center; font-size: 1.1rem;">
+                    <i class="fas fa-check-circle" style="color: var(--accent); margin-right: 8px;"></i> ANÁLISE EM TEMPO REAL
+                </div>
+            </div>
+
+        </div>
+        <div style="text-align: center; margin-top: 14px;">
+            <button id="clearBtn" class="btn-clear">
+                Limpar Histórico
+            </button>
+        </div>
+    </div>
+    
+    <div class="card history-card">
+        <h1><img src="https://www.brasil247.com/sites/wp-content/images/logo/MaximaBet/2975-MaximaBet-370x100-dark.200x54.100.png.webp" alt="Aviator Mini Logo" /></h1>
+        <div id="historyGrid">
+            <div class="chip" style="min-width: 100%;">Aguardando dados...</div>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--muted); text-align: center; margin-top: 10px;">
+            Total de velas: <span id="histCount">0</span>
+        </p>
+    </div>
+
+  </aside>
+
+</div>
+
+<div id="roseModal" class="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="document.getElementById('roseModal').style.display='none'"><i class="fas fa-times"></i></span>
+    <h2>Intervalos de Repetição de Rosa</h2>
+    <p class="det-note">Estes são os intervalos (em número de velas) entre as últimas rosas detectadas, baseando-se no limite de ±<span id="tol">3</span> casas.</p>
+    <ul id="rosePatternsList">
+      <li>Nenhum padrão detectado</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+    // =========================================================================
+    // CONFIGURAÇÕES
+    // =========================================================================
+    const WINDOW_14 = 14;       
+    const WINDOW_COLORS = 25;   
+    const TOLERANCE_ROSE = 3;   
+    const MIN_REPEAT_ROSE = 2;  
+    const MAX_ROSE_INTERVAL = 23;
+    const MAX_ROSE_CUTOFF = 26; 
+    const ROSE_RESET_WAIT = 2;  
+    const ROSE_RESET_THRESHOLD = 50;
+    const GROUP_SIZE = 7;       
+    const AVG_WINDOW = 10;      
+    const AVG_COLOR_WINDOW = 4;
+
+    const AVG_DIVISOR_BLUE_PURPLE = 1.15; 
+    const AVG_DIVISOR_PINK = 1.7; 
+    const AVG_MIN_BLUE = 1.10; 
+    const AVG_MIN_PURPLE = 2.00;
+    const AVG_MIN_PINK = 10.00;
+
+    // =========================================================================
+    // ESTADO
+    // =========================================================================
+    let historyData = JSON.parse(localStorage.getItem('aviator_history_v5')) || [];
+    let values = historyData.map(h => h.value);
+    let rosePatterns = [];
+    let lastPrediction = null;
+    
+    const historyGrid = document.getElementById('historyGrid');
+    const clearBtn = document.getElementById('clearBtn');
+    const histCount = document.getElementById('histCount');
+    const detTable = document.getElementById('detTable');
+    const alerts = document.getElementById('alerts');
+    const rosePatternsList = document.getElementById('rosePatternsList');
+    const sinceRoseEl = document.getElementById('sinceRose');
+    const lowSpikeCountEl = document.getElementById('lowSpikeCount');
+    const windowCountEl = document.getElementById('windowCount');
+    const avgBlueEl = document.getElementById('avgBlueEl');
+    const avgPurpleEl = document.getElementById('avgPurpleEl');
+    const avgPinkEl = document.getElementById('avgPinkEl');
+    
+    document.getElementById('tol').innerText = TOLERANCE_ROSE;
+
+    // =========================================================================
+    // FUNÇÕES CORE DE LÓGICA 
+    // =========================================================================
+    function saveState() {
+      localStorage.setItem('aviator_history_v5', JSON.stringify(historyData));
+    }
+    
+    function colorClass(v) {
+      if (v >= 10) return 'c-high'; 
+      if (v >= 2) return 'c-mid'; 
+      return 'c-low'; 
+    }
+
+    function bandForPrediction(score) {
+      if (score > 0.55) return 'BUSCAR 10X+';
+      if (score > 0.25) return 'BUSCAR 3X-5X+';
+      if (score > 0.05) return 'BAIXO (~2.00X)';
+      return 'MUITO BAIXO (~1.50X)';
+    }
+
+    function getCurrentTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+    }
+
+                    // 🔥 FUNÇÃO ATUALIZADA - AGORA LÊ CADA VELA INDIVIDUAL (sem limite de 6)
+    function processAndRenderHistory(rawData) {
+        console.log('🔍 Dados recebidos do Firebase (novo formato individual):', rawData);
+
+        if (!rawData || typeof rawData !== 'object' || Object.keys(rawData).length === 0) {
+            historyData = [];
+            values = [];
+            updatePrediction();
+            alerts.innerText = '⚠️ Conectado, mas sem dados ainda.';
+            alerts.classList.add('status-error');
+            return;
+        }
+
+        // Converte o objeto Firebase { chave1: {...}, chave2: {...} } em array
+        let entries = Object.values(rawData);
+
+        // Ordena cronologicamente (data + hora)
+        entries.sort((a, b) => {
+            const timeA = `${a.date || ''} ${a.time || ''}`;
+            const timeB = `${b.date || ''} ${b.time || ''}`;
+            return timeA.localeCompare(timeB);
+        });
+
+        // Monta o histórico no formato que o dashboard espera
+        const finalHistory = entries
+          .map(entry => ({ 
+             value: parseFloat(entry.multiplier || entry.value || 0), 
+             time: entry.time || getCurrentTime()
+          }))
+          .filter(item => !isNaN(item.value) && item.value >= 1.00);
+
+        historyData = finalHistory.slice(-50000); 
+        values = historyData.map(h => h.value); 
+
+        saveState();
+        updateRosePatterns(values);
+        updatePrediction(); 
+        
+        alerts.innerText = `✅ Sincronizado! ${historyData.length} velas (Maxima)`;
+        alerts.classList.remove('status-error');
+    }
+    // =========================================================================
+    // LISTENERS E CONTROLES
+    // =========================================================================
+    clearBtn.addEventListener('click', () => {
+      if (confirm('ATENÇÃO: Você tem certeza que deseja LIMPAR o histórico? Esta ação é irreversível.')) {
+        historyData = [];
+        values = [];
+        rosePatterns = [];
+        lastPrediction = null;
+        saveState();
+        updatePrediction();
+        alerts.innerText = 'Histórico limpo com sucesso.';
+        alerts.classList.remove('status-error');
+      }
+    });
+
+    window.onclick = function(event) {
+      const modal = document.getElementById('roseModal');
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+
+    // =========================================================================
+// CONEXÃO FIREBASE (ATUALIZADA)
+// =========================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyCf5bcTMw5O3OZFCwKmuRrMoAg3A5o5erg",
+  authDomain: "aviatormax-ac28e.firebaseapp.com",
+  databaseURL: "https://aviatormax-ac28e-default-rtdb.firebaseio.com",
+  projectId: "aviatormax-ac28e",
+  storageBucket: "aviatormax-ac28e.firebasestorage.app",
+  messagingSenderId: "803925677451",
+  appId: "1:803925677451:web:92a8e97799adcf63ea0b8e",
+  measurementId: "G-91BL357JVK"
+};
+
+try {
+    const app = firebase.initializeApp(firebaseConfig);
+    const dbRef = app.database().ref("historymaxima");
+
+    dbRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        processAndRenderHistory(data);
+    }, (error) => {
+        alerts.innerText = `❌ Erro de conexão com Firebase: ${error.message}`;
+        alerts.classList.add('status-error');
+        console.error(error);
+    });
+    
+} catch (e) {
+    alerts.innerText = '❌ ERRO: Falha ao inicializar o Firebase. Verifique o console para detalhes.';
+    alerts.classList.add('status-error');
+    console.error('Erro de inicialização do Firebase:', e);
+}
+    
+    // =========================================================================
+    // DETECTORES DE PADRÕES
+    // =========================================================================
+    
+    function updateRosePatterns(vals) { 
+        const roseIdx = [];
+        let lastRoseIndex = -1; 
+        let spikeCount = 0; 
+        let lastSpikeIndex = -1;
+        
+        lowSpikeCountEl.innerText = 0; 
+        
+        for (let i = vals.length - 1; i >= 0; i--) {
+            if (vals[i] >= ROSE_RESET_THRESHOLD) {
+                lastSpikeIndex = i;
+                break;
+            }
+        }
+
+        const startIndex = lastSpikeIndex + 1;
+        for (let i = startIndex; i < vals.length; i++) {
+            if (vals[i] >= 10 && vals[i] < ROSE_RESET_THRESHOLD) {
+                spikeCount++;
+            }
+        }
+        
+        lowSpikeCountEl.innerText = spikeCount.toString();
+        
+        for (let i = 0; i < vals.length; i++) {
+          if (vals[i] >= 10) {
+              roseIdx.push(i);
+              lastRoseIndex = i;
+          }
+        }
+        
+        const sinceLastRose = vals.length > 0 && lastRoseIndex >= 0 ? vals.length - 1 - lastRoseIndex : MAX_ROSE_INTERVAL + 1;
+        sinceRoseEl.innerText = vals.length > 0 && lastRoseIndex >= 0 ? sinceLastRose.toString() : '—';
+        windowCountEl.innerText = Math.min(WINDOW_14, vals.length);
+        
+        if (sinceLastRose > MAX_ROSE_INTERVAL) {
+            rosePatterns = [];
+            rosePatternsList.innerHTML = '<li>Padrões zerados: Ultrapassou o limite de 23 casas sem rosa.</li>';
+        }
+
+        const newIntervals = [];
+        for (let i = roseIdx.length - 1; i >= 1; i--) {
+            const interval = roseIdx[i] - roseIdx[i - 1];
+            
+            if (interval > MAX_ROSE_INTERVAL) { 
+                break; 
+            }
+            
+            newIntervals.push(interval); 
+        }
+        newIntervals.reverse();
+        
+        const intervalCounts = {};
+        newIntervals.forEach(interval => {
+          intervalCounts[interval] = (intervalCounts[interval] || 0) + 1;
+        });
+
+        if (sinceLastRose <= MAX_ROSE_INTERVAL) {
+             rosePatterns = Object.keys(intervalCounts).map(interval => ({
+                interval: parseInt(interval),
+                count: intervalCounts[interval]
+            }));
+            rosePatterns.sort((a, b) => a.interval - b.interval); 
+        }
+
+        rosePatternsList.innerHTML = rosePatterns.length
+          ? rosePatterns.map(p => `<li>${p.interval}ª casa <span class="count">(${p.count}x)</span></li>`).join('')
+          : '<li>Padrões zerados ou Nenhum padrão detectado</li>';
+    }
+
+    function detWindowFrequency(vals) { 
+      const N = Math.min(WINDOW_14, vals.length);
+      if (N < 4) return null;
+      const sub = vals.slice(-N);
+      const rosa = sub.filter(v => v >= 10).length;
+      const roxo = sub.filter(v => v >= 2 && v < 10).length;
+      const azul = sub.filter(v => v < 2).length;
+      let moment = '—';
+      let vote = 0; 
+      
+      if (rosa >= 1 && (roxo + rosa) > 2 && azul <= 1) { 
+        moment = 'PAGUE (Alto RTP) - Forte';
+        vote = 1; 
+      }
+      else if (roxo >= 2 && azul <= 2 && rosa === 0) {
+        moment = 'PAGUEZINHO (Roxinhos) - Médio';
+        vote = 0.5; 
+      }
+      else if (azul > roxo && azul > rosa) {
+        moment = 'Tome (Casa Recolhe)';
+        vote = -1;
+      }
+      else if (roxo > azul && roxo >= rosa && roxo > 0) {
+        moment = 'Paguezinho (Roxinhos) - Fraco'; 
+        vote = 0.3;
+      } else if (rosa > azul && rosa >= roxo && roxo > 0) {
+        moment = 'Explorar Altas (Rosado)';
+        vote = 0.8;
+      }
+
+      return { name: `Frequência ${N}`, vote, strength: 0.4, note: `Azul:${azul} Roxo:${roxo} Rosa:${rosa} | Momento: ${moment}`, moment };
+    }
+    
+    function detRepeatRoses(vals) { 
+      const roseIdx = [];
+      let lastRose = -1;
+      for (let i = 0; i < vals.length; i++) {
+        if (vals[i] >= 10) {
+            roseIdx.push(i);
+            lastRose = i;
+        }
+      }
+      if (rosePatterns.length === 0) {
+          return null; 
+      }
+      
+      const lastRosePos = roseIdx[roseIdx.length - 1];
+      const sinceLastRose = vals.length - 1 - lastRosePos;
+      
+      if (sinceLastRose > MAX_ROSE_CUTOFF) {
+          return null;
+      }
+      
+      const strongestPattern = rosePatterns.reduce((max, current) => {
+          return (current.count > max.count || max.count === undefined) ? current : max;
+      }, { count: -1 });
+      
+      if (strongestPattern.count < MIN_REPEAT_ROSE) {
+          return null;
+      }
+
+      const patternInterval = strongestPattern.interval;
+      const minAfter = Math.max(1, patternInterval - TOLERANCE_ROSE);
+      const maxAfter = Math.min(patternInterval + TOLERANCE_ROSE, MAX_ROSE_INTERVAL);
+      
+      if (sinceLastRose >= minAfter && sinceLastRose <= maxAfter) {
+           return {
+            name: 'Repetição de Rosas',
+            vote: 1,
+            strength: 0.8, 
+            note: `PADRÃO ATIVO: Intervalo ${patternInterval} (±${TOLERANCE_ROSE}). ENTRAMOS AGORA! (Repetição: ${strongestPattern.count}x)`
+          };
+      } else if (sinceLastRose < minAfter) {
+           return {
+            name: 'Repetição de Rosas',
+            vote: 0.5,
+            strength: 0.6,
+            note: `Aguardando entrada. Próxima rosa esperada em ${minAfter}–${maxAfter} casas (Faltam ${minAfter - sinceLastRose} casas)`
+          };
+      } else if (sinceLastRose > maxAfter) {
+           return {
+            name: 'Repetição de Rosas',
+            vote: 0,
+            strength: 0.2,
+            note: `Padrão de ${patternInterval} QUEBRADO. Rodadas sem rosa: ${sinceLastRose}`
+          };
+      }
+      
+      return null;
+    }
+    
+    function detColorPatternRepeat(vals) { 
+      const N = Math.min(WINDOW_COLORS, vals.length);
+      if (N < 6) return null;
+      const sub = vals.slice(-N);
+      const map = sub.map(v => v >= 10 ? 'S' : (v >= 2 ? 'R' : 'A'));
+      
+      const maxPat = 5;
+      for (let L = maxPat; L >= 2; L--) {
+        const pat = map.slice(-L).join('');
+        const priorSection = map.slice(0, map.length - L).join('');
+        const lastIndex = priorSection.lastIndexOf(pat);
+
+        if (lastIndex !== -1) {
+          const nextExpectedIndex = lastIndex + L;
+          let nextExpectedColorLetter = '';
+          let vote = 0;
+          let strength = 0.35;
+
+          if (nextExpectedIndex < map.length) { 
+              nextExpectedColorLetter = map[nextExpectedIndex];
+              if (nextExpectedColorLetter === 'S') vote = 1;
+              else if (nextExpectedColorLetter === 'R') vote = 0.5;
+              else if (nextExpectedColorLetter === 'A') vote = -0.5;
+          } else {
+              nextExpectedColorLetter = '—';
+              vote = 0.1; 
+          }
+          
+          const expectedDisplay = nextExpectedColorLetter === 'S' ? 'ROSA' : (nextExpectedColorLetter === 'R' ? 'ROXA' : (nextExpectedColorLetter === 'A' ? 'AZUL' : 'INCERTO'));
+          
+          return {
+            name: `Padrão cores (L=${L})`,
+            vote,
+            strength,
+            note: `Padrão ${pat} repetido. Próxima: ${expectedDisplay}`,
+            metaNextColor: nextExpectedColorLetter 
+          };
+        }
+      }
+      return null;
+    }
+    
+    function detPayingColumn(vals) { 
+      if (vals.length < 1) return null;
+      const lastGroup = vals.slice(-GROUP_SIZE);
+      const positives = lastGroup.filter(v => v >= 2).length;
+      const negatives = lastGroup.length - positives;
+      if (positives > negatives) {
+        return {
+          name: 'Coluna Pagadora',
+          vote: 1,
+          strength: 0.4,
+          note: `Última coluna (${lastGroup.length}): ${positives} positivas > ${negativas} negativas - boa para operar`
+        };
+      } else if (negativas > positives) {
+        return {
+          name: 'Coluna Tome',
+          vote: -1,
+          strength: 0.4,
+          note: `Última coluna: ${negativas} negativas > ${positives} positivas - ruim para operar`
+        };
+      }
+      return null;
+    }
+    
+    function detSurf(vals) { 
+      let seq = 0;
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (vals[i] >= 2) seq++;
+        else break;
+      }
+      if (seq >= 4 && seq <= 9) {
+        const strength = Math.min(0.2 + 0.08 * (seq - 4), 0.8);
+        return {
+          name: `Surf (${seq}x)`,
+          vote: 1,
+          strength,
+          note: `Sequência de ${seq} velas >=2x (puxado por 5x+ ou roxo baixo)`
+        };
+      }
+      return null;
+    }
+    
+    function detOneX(vals) { 
+      if (vals.length < 1) return null;
+      if (vals[vals.length - 1] === 1.00) {
+        return {
+          name: 'Estratégia 1.00x',
+          vote: 1,
+          strength: 0.25,
+          note: 'Última vela = 1.00x → entrada de baixo risco sugerida (chance de 4x+ ou rosa)'
+        };
+      }
+      return null;
+    }
+    
+    function detFifthAfterRose(vals) { 
+      const lastRose = (() => { for (let i = vals.length - 1; i >= 0; i--) if (vals[i] >= 10) return i; return -1; })();
+      if (lastRose < 0) return null;
+      const rel = vals.length - 1 - lastRose;
+      if (rel >= 4 && rel <= 5) {
+        return {
+          name: '5ª Casa (pós-rosa)',
+          vote: 1,
+          strength: 0.25,
+          note: `${rel} casas desde última rosa; atenção na 4ª/5ª para outra rosa`
+        };
+      }
+      return null;
+    }
+    
+    function detXadrez(vals) { 
+      const N = Math.min(10, vals.length);
+      if (N < 6) return null;
+      const sub = vals.slice(-N);
+      const mapC = sub.map(v => v >= 10 ? 2 : (v >= 2 ? 1 : 0));
+      let alt = true;
+      for (let i = 1; i < mapC.length; i++) {
+        if (mapC[i] === mapC[i - 1] || mapC[i] === 2 || mapC[i - 1] === 2) { alt = false; break; }
+      }
+      if (alt) {
+        return {
+          name: 'Xadrez (alt. roxo/azul)',
+          vote: 0.3,
+          strength: 0.3,
+          note: `Alternância detectada (${N} velas)`
+        };
+      }
+      const last3 = mapC.slice(-3);
+      if (last3.length === 3 && last3[0] === 0 && last3[1] === 0 && last3[2] !== 2) {
+        return {
+          name: 'Xadrez quebrado→2 Azuis',
+          vote: -1,
+          strength: 0.45,
+          note: 'Xadrez quebrou em 2 azuis seguidas — risco de mais azuis'
+        };
+      }
+      return null;
+    }
+    
+    function detTwoPlusCluster(vals) { 
+      const sub = vals.slice(-8);
+      let foundPair = false;
+      for (let i = 0; i < sub.length - 1; i++) {
+        if (sub[i] >= 2 && sub[i + 1] >= 2) { foundPair = true; break; }
+      }
+      if (foundPair) {
+        return {
+          name: 'Cluster >=2x',
+          vote: 1,
+          strength: 0.2,
+          note: 'Pares >=2x podem puxar velas 5x'
+        };
+      }
+      return null;
+    }
+    
+    function detHugeSpikePattern(vals) { 
+      if (vals.length < 6) return null;
+      const last = vals[vals.length - 1];
+      if (last >= 48) {
+        const prev7 = vals.slice(-8, -1);
+        const prev6 = vals.slice(-7, -1);
+        const ok7 = prev7.length === 7 && prev7.every(v => v < 50);
+        const ok6 = prev6.length === 6 && prev6.every(v => v < 50);
+        if (ok7 || ok6) {
+          return {
+            name: 'Pico >48x pós 6-7<50',
+            vote: 1,
+            strength: 0.35,
+            note: `Pico alto após ${ok7 ? 7 : 6} velas <50x`
+          };
+        }
+      }
+      return null;
+    }
+    
+    function detBlueStreak(vals) { 
+      let seq = 0;
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (vals[i] < 2) seq++;
+        else break;
+      }
+      if (seq >= 3) {
+        const strength = 0.3 + 0.1 * (seq - 3);
+        return {
+          name: `Sequência Azuis (${seq})`,
+          vote: -1,
+          strength: Math.min(strength, 0.7),
+          note: `Sequência de ${seq} azuis - cuidado, pode puxar até 10 azuis`
+        };
+      }
+      return null;
+    }
+    
+    function detFourBlueStreak(vals) {
+      if (vals.length < 4) return null;
+      const last4 = vals.slice(-4);
+      const isFourBlue = last4.every(v => v < 2);
+      if (isFourBlue) {
+        return {
+          name: '4 Azuis Seguidos',
+          vote: 0, 
+          strength: 1.0, 
+          note: '4 Azuis Seguidos detectados — Alto Risco/Aguardando momento'
+        };
+      }
+      return null;
+    }
+    
+    function detAverages(vals) {
+      if (vals.length === 0) return null;
+      
+      const lastBlue = vals.filter(v => v < 2).pop();
+      const lastPurple = vals.filter(v => v >= 2 && v < 10).pop();
+      const lastPink = vals.filter(v => v >= 10).pop();
+
+      const avgBlueRaw = lastBlue ? lastBlue / AVG_DIVISOR_BLUE_PURPLE : 0;
+      const avgPurpleRaw = lastPurple ? lastPurple / AVG_DIVISOR_BLUE_PURPLE : 0;
+      const avgPinkRaw = lastPink ? lastPink / AVG_DIVISOR_PINK : 0;
+      
+      const avgBlue = lastBlue ? Math.max(avgBlueRaw, AVG_MIN_BLUE) : 0;
+      const avgPurple = lastPurple ? Math.max(avgPurpleRaw, AVG_MIN_PURPLE) : 0;
+      const avgPink = lastPink ? Math.max(avgPinkRaw, AVG_MIN_PINK) : 0;
+
+      avgBlueEl.innerText = avgBlue ? avgBlue.toFixed(2) + 'x' : '—';
+      avgPurpleEl.innerText = avgPurple ? avgPurple.toFixed(2) + 'x' : '—';
+      avgPinkEl.innerText = avgPink ? avgPink.toFixed(2) + 'x' : '—';
+
+      return {
+        name: `Médias (Saída Segura)`,
+        vote: 0,
+        strength: 0.1,
+        note: `Azul (Piso ${AVG_MIN_BLUE.toFixed(2)}x) | Roxo (Piso ${AVG_MIN_PURPLE.toFixed(2)}x) | Rosa (Piso ${AVG_MIN_PINK.toFixed(2)}x)`
+      };
+    }
+    
+    const DETECTORS = [
+      detFourBlueStreak,
+      detWindowFrequency,
+      detRepeatRoses,
+      detColorPatternRepeat,
+      detPayingColumn,
+      detSurf,
+      detOneX,
+      detFifthAfterRose,
+      detXadrez,
+      detTwoPlusCluster,
+      detHugeSpikePattern,
+      detBlueStreak,
+      detAverages 
+    ];
+    
+    // =========================================================================
+    // AGREGAÇÃO E PREVISÃO
+    // =========================================================================
+    function aggregateAll() {
+      const reports = [];
+      for (const fn of DETECTORS) {
+        try {
+          const r = fn(values);
+          if (r) reports.push(r);
+        } catch (e) {
+          console.error('Erro no detector:', fn.name, e);
+        }
+      }
+      
+      let score = 0, wsum = 0;
+      const scoringReports = reports.filter(r => r.name !== '4 Azuis Seguidos'); 
+      
+      scoringReports.forEach(r => {
+        let vote = r.vote || 0;
+        const strength = r.strength || 0.15;
+        
+        if (r.name.startsWith('Padrão cores') && r.metaNextColor === 'A' && vote > 0) {
+            vote = -0.1;
+        }
+        
+        score += vote * strength;
+        wsum += strength;
+      });
+      const final = wsum ? score / wsum : 0;
+      const winDet = reports.find(r => r.name && r.name.startsWith('Frequência'));
+      const momentStr = winDet && winDet.moment ? winDet.moment : '—';
+      return { reports, score: final, conf: Math.min(Math.abs(final), 0.99), moment: momentStr };
+    }
+
+    function makePrediction(agg) {
+      if (values.length === 0) {
+        return { label: 'BUSCANDO SINAL', band: '~1.50x', conf: 0, note: 'Nenhum dado para previsão. Aguardando velas...' };
+      }
+      
+      const score = agg.score;
+      let band = bandForPrediction(score);
+      let note = '';
+      
+      const fourBlueDet = agg.reports.find(r => r.name === '4 Azuis Seguidos');
+      if (fourBlueDet) {
+          lastPrediction = null;
+          return { label: 'AGUARDANDO', band: '4 Azuis Seguidos', conf: agg.conf, note: fourBlueDet.note };
+      }
+      
+      const roseDet = agg.reports.find(r => r.name === 'Repetição de Rosas');
+      
+      const winDet = agg.reports.find(r => r.name && r.name.startsWith('Frequência'));
+      if (winDet && winDet.moment.includes('Tome')) {
+        lastPrediction = null;
+        return { label: 'TOME (RISCO ALTO)', band: 'No signals (TOME)', conf: agg.conf, note: 'Predominância AZUL — EVITAR SINAIS' };
+      }
+
+      if (roseDet && roseDet.vote > 0.6) {
+          band = 'BUSCAR 10X+';
+          note = `SINAL DE ROSA FORTE: ${roseDet.note}`;
+      } else if (score < 0.55 && band === 'BUSCAR 10X+') {
+          band = 'BUSCAR 3X-5X+';
+          note = note || 'Análise de múltiplos sinais. Favor observar médias.';
+      } else {
+          note = note || 'Análise de múltiplos sinais. Favor observar médias.';
+      }
+      
+      lastPrediction = { band, conf: agg.conf };
+      return { label: band, band, conf: agg.conf, note };
+    }
+
+    function updatePrediction() {
+      const agg = aggregateAll();
+      const pred = makePrediction(agg);
+      
+      detTable.innerHTML = '';
+      agg.reports.filter(r => !r.name.startsWith('Médias')).forEach(r => { 
+        const row = document.createElement('tr');
+        
+        let sinal = r.vote > 0 ? '↑' : (r.vote < 0 ? '↓' : '—');
+        if (r.name.startsWith('Padrão cores') && r.metaNextColor && r.metaNextColor !== '—') {
+            sinal = r.metaNextColor; 
+        }
+
+        row.innerHTML = `<td>${r.name}</td><td class="det-note">${r.note || ''}</td><td>${sinal}</td>`;
+        detTable.appendChild(row);
+      });
+      
+      renderGrid(pred);
+    }
+
+    function renderGrid(pred) {
+      historyGrid.innerHTML = '';
+
+      if (pred && pred.label && pred.conf !== undefined) {
+          const predChip = document.createElement('div');
+          
+          let predColorClass = '';
+          const confPercent = (pred.conf * 100).toFixed(0) + '%';
+          
+          if (pred.label.includes('10X+')) predColorClass = 'c-high';
+          else if (pred.label.includes('3X-5X+')) predColorClass = 'c-mid';
+          else if (pred.label.includes('TOME') || pred.label.includes('AGUARDANDO')) predColorClass = 'c-tome';
+
+          predChip.className = `chip ${predColorClass} pred-chip`;
+          
+          const labelText = pred.label.replace('BUSCAR ', '');
+
+          predChip.innerHTML = `
+            <div class="val" style="font-size: 1.1rem; color: var(--text);">PRÓXIMA:</div>
+            <div class="val" style="font-size: 1.8rem; font-weight: 700; color: ${predColorClass === 'c-tome' ? 'var(--danger)' : 'var(--accent)'}">${labelText}</div>
+            <div class="time" style="color: rgba(255,255,255,0.6);">Conf: ${confPercent}</div>
+          `;
+          historyGrid.appendChild(predChip);
+      }
+      
+      if (historyData.length === 0) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'chip';
+        emptyMessage.innerText = 'Aguardando 1ª vela...';
+        historyGrid.appendChild(emptyMessage);
+      } else {
+        const reversedData = [...historyData].reverse();
+        const maxChips = 150;
+        for (let i = 0; i < Math.min(reversedData.length, maxChips); i++) {
+          const item = reversedData[i];
+          if (!isNaN(item.value) && item.value >= 1.00) {
+            const chip = document.createElement('div');
+            chip.className = `chip ${colorClass(item.value)}`;
+            chip.innerHTML = `<div class="val">${item.value.toFixed(2)}x</div><div class="time">${item.time}</div>`; 
+            historyGrid.appendChild(chip);
+          }
+        }
+      }
+      histCount.innerText = historyData.length;
+    }
+
+    updateRosePatterns(values); 
+    updatePrediction(); 
+</script>
+
+</body>
+</html>
