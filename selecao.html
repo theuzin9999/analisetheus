@@ -63,6 +63,7 @@
             --color-goathbet-neon: #00ff6b;
             --color-aposta1-neon: #b300ff;
             --color-apostaganha-neon: #00b7eb;
+            --color-maximabet-neon: #ffaa00; /* Cor neon para a MaximaBet */
             --color-button-analyze: linear-gradient(135deg, #1c2526, #2a2e45);
         }
 
@@ -182,6 +183,10 @@
         .platform-card.platform-apostaganha {
             border-color: var(--color-apostaganha-neon);
         }
+        
+        .platform-card.platform-maximabet {
+            border-color: var(--color-maximabet-neon);
+        }
 
         .platform-logo {
             max-width: 55%;
@@ -267,6 +272,15 @@
 
         .platform-apostaganha .dashboard-button:hover {
             background: linear-gradient(135deg, #4fc3f7, #00b7eb);
+        }
+
+        .platform-maximabet .dashboard-button {
+            background: linear-gradient(135deg, var(--color-maximabet-neon), #e65100);
+            box-shadow: 0 0 10px var(--color-maximabet-neon);
+        }
+
+        .platform-maximabet .dashboard-button:hover {
+            background: linear-gradient(135deg, #ffb74d, #ffaa00);
         }
 
         .splash {
@@ -402,6 +416,15 @@
                 <a href="apostaganha.html" class="button analyze-button">ANALISAR</a>
                 <a href="dashganha.html" class="button dashboard-button">DASHBOARD</a>
                 <a href="bot2xapostaganha.html" class="button analyze-button">BOT2X</a>
+            </div>
+        </div>
+
+        <div class="platform-card platform-maximabet">
+            <img src="https://www.brasil247.com/sites/wp-content/images/logo/MaximaBet/2975-MaximaBet-370x100-dark.200x54.100.png.webp" alt="Aviator Mini Logo" class="platform-logo">
+            <div class="buttons-container">
+                <a href="maxima.html" class="button analyze-button">ANALISAR</a>
+                <a href="dashmaxima.html" class="button dashboard-button">DASHBOARD</a>
+                <a href="bot2xmaxm.html" class="button analyze-button">BOT2X</a>
             </div>
         </div>
 
