@@ -573,11 +573,11 @@
         }
         let rawHistory = Object.values(rawData);
         const finalHistory = rawHistory
-          .filter(item => item.value && item.time && item.date)
-          .map(item => ({ 
-             value: parseFloat(item.value), 
-             time: item.time 
-          }));
+          .filter(item => (item.value || item.multiplier) && item.time && item.date)
+.map(item => ({ 
+   value: parseFloat(item.value ?? item.multiplier), 
+   time: item.time 
+}));
         historyData = finalHistory.slice(-50000); 
         values = historyData.map(h => h.value); 
         saveState();
